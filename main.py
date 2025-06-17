@@ -41,11 +41,30 @@ def encode_input(data: InputData):
     ]
 
 @app.post("/predict")
-def predict(data: InputData):
-    try:
-        features = np.array(encode_input(data)).reshape(1, -1)
-        prediction_encoded = model.predict(features)[0]
-        prediction = target_encoder.inverse_transform([prediction_encoded])[0]
-        return {"prediction": prediction}
-    except Exception as e:
-        return {"error": str(e)}
+def predict(data: InputModel):
+    input_dict = data.dict()
+    input_df = pd.DataFrame([input_dict])
+
+    # Preprocessing
+    input_df['Gender'] = label_encoders['Gender'].transform(input_df['Gender'])
+    input_df['InjJoint'] = label_encoders['InjJoint'].transform(input_df['InjJoint'])
+
+    # Prediction
+    prediction = model.predict(input_df)
+    decoded = target_encoder.inverse_transform(prediction)[0]
+
+    # Logical validation
+    joint = input_dict['InjJoint'].lower()
+    injury_location_map = {
+        'it band syndrome': 'thigh',
+        'pfps': 'knee',
+        'shin splints': 'lower leg',
+        'achilles tendinitis': 'ankle',
+        'plantar fasciitis': 'foot',
+        'hamstring muscle strain': 'thigh',
+    }
+
+    if joint in ['foot', 'ankle'] and injury_location_map.get(decoded.lower(), '') not in ['foot', 'ankle']:
+        decoded = 'inconclusive'
+
+    return {"prediction": decoded}
