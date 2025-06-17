@@ -3,7 +3,7 @@ import joblib
 import numpy as np
 from pydantic import BaseModel
 
-app = FastAPI()  # <== THIS must exist and be at top-level
+app = FastAPI()
 
 # Load models and encoders
 model = joblib.load("ensemble_model.pkl")
@@ -40,31 +40,33 @@ def encode_input(data: InputData):
         data.TotalRaceTimeMins,
     ]
 
+# Injury → expected joint mapping
+injury_location_map = {
+    'iliotibial band syndrome': 'thigh',
+    'patellofemoral pain syndrome': 'knee',
+    'shin splints': 'lower leg',
+    'achilles tendinitis': 'ankle',
+    'plantar fasciitis': 'foot',
+    'hamstring strain': 'thigh',
+    'calf strain': 'lower leg',
+    'groin strain': 'hip',
+    'stress fracture': 'foot',
+}
+
 @app.post("/predict")
-def predict(data: InputModel):
-    input_dict = data.dict()
-    input_df = pd.DataFrame([input_dict])
+def predict(data: InputData):
+    try:
+        features = np.array(encode_input(data)).reshape(1, -1)
+        prediction_encoded = model.predict(features)[0]
+        prediction = target_encoder.inverse_transform([prediction_encoded])[0]
 
-    # Preprocessing
-    input_df['Gender'] = label_encoders['Gender'].transform(input_df['Gender'])
-    input_df['InjJoint'] = label_encoders['InjJoint'].transform(input_df['InjJoint'])
+        # Post-prediction validation
+        inj_joint = data.InjJoint.lower().strip()
+        expected_location = injury_location_map.get(prediction.lower())
 
-    # Prediction
-    prediction = model.predict(input_df)
-    decoded = target_encoder.inverse_transform(prediction)[0]
+        if expected_location and expected_location not in inj_joint:
+            prediction = "inconclusive"
 
-    # Logical validation
-    joint = input_dict['InjJoint'].lower()
-    injury_location_map = {
-        'it band syndrome': 'thigh',
-        'pfps': 'knee',
-        'shin splints': 'lower leg',
-        'achilles tendinitis': 'ankle',
-        'plantar fasciitis': 'foot',
-        'hamstring muscle strain': 'thigh',
-    }
-
-    if joint in ['foot', 'ankle'] and injury_location_map.get(decoded.lower(), '') not in ['foot', 'ankle']:
-        decoded = 'inconclusive'
-
-    return {"prediction": decoded}
+        return {"prediction": prediction}
+    except Exception as e:
+        return {"error": str(e)}
