@@ -3,7 +3,7 @@ import joblib
 import numpy as np
 from pydantic import BaseModel
 
-app = FastAPI()
+app = FastAPI()  # <== THIS must exist and be at top-level
 
 # Load models and encoders
 model = joblib.load("ensemble_model.pkl")
@@ -40,33 +40,12 @@ def encode_input(data: InputData):
         data.TotalRaceTimeMins,
     ]
 
-# Injury → expected joint mapping
-injury_location_map = {
-    'iliotibial band syndrome': 'thigh',
-    'patellofemoral pain syndrome': 'knee',
-    'shin splints': 'lower leg',
-    'achilles tendinitis': 'ankle',
-    'plantar fasciitis': 'foot',
-    'hamstring strain': 'thigh',
-    'calf strain': 'lower leg',
-    'groin strain': 'hip',
-    'stress fracture': 'foot',
-}
-
 @app.post("/predict")
 def predict(data: InputData):
     try:
         features = np.array(encode_input(data)).reshape(1, -1)
         prediction_encoded = model.predict(features)[0]
         prediction = target_encoder.inverse_transform([prediction_encoded])[0]
-
-        # Post-prediction validation
-        inj_joint = data.InjJoint.lower().strip()
-        expected_location = injury_location_map.get(prediction.lower())
-
-        if expected_location and expected_location not in inj_joint:
-            prediction = "inconclusive"
-
         return {"prediction": prediction}
     except Exception as e:
         return {"error": str(e)}
