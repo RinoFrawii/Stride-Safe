@@ -9,7 +9,7 @@ app = FastAPI()
 # ✅ CORS Middleware for FlutterFlow / mobile builds
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://stridesafe.flutterflow.app"],  # You can test with ["*"] if needed
+    allow_origins=["*"],  # You can test with ["*"] if needed
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
