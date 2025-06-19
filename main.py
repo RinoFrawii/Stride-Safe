@@ -1,19 +1,25 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 import joblib
 import numpy as np
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 app = FastAPI()
 
 # ✅ CORS Middleware for FlutterFlow / mobile builds
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # You can test with ["*"] if needed
+    allow_origins=["*"],  # Change to ["https://stridesafe.flutterflow.app"] for production
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["*"],  # MUST include OPTIONS
     allow_headers=["*"],
 )
+
+# ✅ Manual preflight handler for OPTIONS requests
+@app.options("/predict")
+async def preflight_handler():
+    return JSONResponse(content={"message": "Preflight OK"}, status_code=200)
 
 # ✅ Load model and encoders with error handling
 try:
@@ -68,11 +74,4 @@ def predict(data: InputData):
 
     try:
         print("📥 Request received:", data.dict())
-        features = np.array(encode_input(data)).reshape(1, -1)
-        prediction_encoded = model.predict(features)[0]
-        prediction = target_encoder.inverse_transform([prediction_encoded])[0]
-        print("✅ Prediction successful:", prediction)
-        return {"prediction": prediction}
-    except Exception as e:
-        print("❌ Prediction error:", str(e))
-        return {"error": str(e)}
+        features = np.array(encode_input(d_
