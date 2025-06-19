@@ -2,8 +2,18 @@ from fastapi import FastAPI
 import joblib
 import numpy as np
 from pydantic import BaseModel
+from fastapi.middleware.cors import CORSMiddleware  # ✅ CORS added
 
-app = FastAPI()  # <== THIS must exist and be at top-level
+app = FastAPI()
+
+# ✅ CORS Middleware for FlutterFlow / mobile apps
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["https://stridesafe.flutterflow.app"],  # 🔒 In production, replace with your app URL
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Load models and encoders
 model = joblib.load("ensemble_model.pkl")
@@ -40,12 +50,15 @@ def encode_input(data: InputData):
         data.TotalRaceTimeMins,
     ]
 
+# Prediction endpoint
 @app.post("/predict")
 def predict(data: InputData):
     try:
         features = np.array(encode_input(data)).reshape(1, -1)
         prediction_encoded = model.predict(features)[0]
         prediction = target_encoder.inverse_transform([prediction_encoded])[0]
+        print("✅ API called. Prediction:", prediction)  # Optional log
         return {"prediction": prediction}
     except Exception as e:
+        print("❌ Prediction error:", str(e))  # Optional log
         return {"error": str(e)}
