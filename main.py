@@ -74,4 +74,11 @@ def predict(data: InputData):
 
     try:
         print("📥 Request received:", data.dict())
-        features = np.array(encode_input(d_
+        features = np.array(encode_input(data)).reshape(1, -1)
+        prediction_encoded = model.predict(features)[0]
+        prediction = target_encoder.inverse_transform([prediction_encoded])[0]
+        print("✅ Prediction successful:", prediction)
+        return {"prediction": prediction}
+    except Exception as e:
+        print("❌ Prediction error:", str(e))
+        return {"error": str(e)}
